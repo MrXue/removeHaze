@@ -42,7 +42,7 @@ int main()
 	//TODO:以下值待确定
 	testHazePer->setErodeTimes(5);
 	testHazePer->setHighThreshold(10.0, 10.0);
-
+	testHazePer->setFilterTemplate(7);
 	testHazePer->morphfill();
 	testHazePer->removePeak();
 	return 1;

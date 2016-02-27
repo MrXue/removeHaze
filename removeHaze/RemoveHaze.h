@@ -16,19 +16,19 @@ public:
 	void setResultImagePath(const string resultPath);
 	void setErodeTimes(const int times);//设置侵蚀次数
 	void setHighThreshold(const float mc, const float tc);//设置maxChange和totalChange的阈值进行二值化
+	void setFilterTemplate(int n = 3);//设置消峰时的滤波模板大小
 	void setBinaryImagePath(const string binaryPath);
 
 	void morphfill();//填洼算法       1使用setHotImagePath、setInvertA、setMarkB、setMaskImagePath、setMarkImagePath
 	void removePeak();  //消峰   2使用setTotalChangeImagePath、setMaxChangeImagePath、setErodeImagePath、setErodeTimes、setHighThreshold、setResultImagePath、setBinaryImagePath
 
-
+	GDALDataset *getResultDataset();
 private:
 	void readHotImage();                                                    //读取HOT影像
 	void invertImage(GDALDataset *pDataset, GDALDataset *dstDataset, float a);                //对图像求反 
 	void morphologicalReconstruction(GDALDataset *asMarkDataset, GDALDataset *asMaskDataset);//形态学重建
 	void morphologicalErode(GDALDataset *morphDataset);//形态学侵蚀
 	void detectionPeak();//检测高亮度区域而非云区域，binaryDataset在此创建
-
 	void setInvertA(const float A);//设置求反时的inverta的值
 	void setMarkB(const float B);//设置创建Mark影像时b的值
 
@@ -38,6 +38,7 @@ private:
 	float inverta;//取反时的a得值
 	float markB;  //mark影像的值
 	int erodeN;  //侵蚀的次数
+	int filterTemplateN;
 	float thresholdMC;
 	float thresholdTC;
 	double sGeoTrans[6];

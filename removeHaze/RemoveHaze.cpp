@@ -1,13 +1,31 @@
 #include "RemoveHaze.h"
+#include <vector>
+#include <algorithm>
 
-
-HazePerfection::HazePerfection() :nXSize(0), nYSize(0), nBandCount(1), inverta(0.0), markB(0.0), erodeN(1), thresholdMC(0.0), thresholdTC(0.0)
+HazePerfection::HazePerfection() :nXSize(0), nYSize(0), nBandCount(1), inverta(0.0), markB(0.0), 
+erodeN(1), thresholdMC(0.0), thresholdTC(0.0), filterTemplateN(3)
 {
 }
 
 
 HazePerfection::~HazePerfection()
 {
+	if (hotDataset != NULL)
+		GDALClose((GDALDatasetH)hotDataset);
+	if (maskDataset != NULL)
+		GDALClose((GDALDatasetH)maskDataset);
+	if (markDataset!=NULL)
+		GDALClose((GDALDatasetH)markDataset);
+	if (totalChangeDataset != NULL)
+		GDALClose((GDALDatasetH)totalChangeDataset);
+	if (maxChangeDataset != NULL)
+		GDALClose((GDALDatasetH)maxChangeDataset);
+	if (erodeDataset != NULL)
+		GDALClose((GDALDatasetH)erodeDataset);
+	if (binaryDataset != NULL)
+		GDALClose((GDALDatasetH)binaryDataset);
+	if (resultDataset != NULL)
+		GDALClose((GDALDatasetH)resultDataset);
 }
 
 void HazePerfection::setHotImagePath(const string hotPath)
@@ -390,27 +408,45 @@ void HazePerfection::removePeak()
 {
 	detectionPeak();
 	createResultImage();
-	float a[9] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+	//float a[9] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
 	float *erodePixelsData = new float[nXSize*nYSize];
 	float *binaryPixelsData = new float[nXSize*nYSize];
 	maskDataset->GetRasterBand(1)->RasterIO(GF_Read, 0, 0, nXSize, nYSize, erodePixelsData, nXSize, nYSize, GDT_Float32, 0, 0);
 	binaryDataset->GetRasterBand(1)->RasterIO(GF_Read, 0, 0, nXSize, nYSize, binaryPixelsData, nXSize, nYSize, GDT_Float32, 0, 0);
-	for (int i = 1; i < nYSize-1; i++)
+	int t = (int)(filterTemplateN / 2);
+	int temp = t;
+	int n = t;
+	for (int i = t; i < nYSize - t; i++)
 	{
-		for (int j = 1; j < nXSize-1; j++)
+		for (int j = t; j < nXSize - t; j++)
 		{
 			if (binaryPixelsData[i*nXSize + j] == 1.0)
 			{
-				a[0] = erodePixelsData[(i - 1)*nXSize + j - 1];
-				a[1] = erodePixelsData[(i - 1)*nXSize + j ];
-				a[2] = erodePixelsData[(i - 1)*nXSize + j + 1];
-				a[3] = erodePixelsData[i*nXSize + j - 1];
-				a[4] = erodePixelsData[i*nXSize + j ];
-				a[5] = erodePixelsData[i*nXSize + j + 1];
-				a[6] = erodePixelsData[(i + 1)*nXSize + j - 1];
-				a[7] = erodePixelsData[(i + 1)*nXSize + j ];
-				a[8] = erodePixelsData[(i + 1)*nXSize + j + 1];
-				binaryPixelsData[i*nXSize + j] = minA(a, 9);
+				std::vector<float>filter;
+				while (t != 0)
+				{
+					while (temp != 0)
+					{
+						filter.push_back(erodePixelsData[(i - t)*nXSize + j - temp]);
+						filter.push_back(erodePixelsData[(i - t)*nXSize + j + temp]);
+						filter.push_back(erodePixelsData[(i + t)*nXSize + j - temp]);
+						filter.push_back(erodePixelsData[(i + t)*nXSize + j + temp]);
+						temp--;
+					}
+					temp = n;
+					t--;
+				}
+				t = n;
+				while (t != 0)
+				{
+					filter.push_back(erodePixelsData[i*nXSize + j + t]);
+					filter.push_back(erodePixelsData[i*nXSize + j - t]);
+					t--;
+				}
+				t = n;
+				filter.push_back(erodePixelsData[i*nXSize + j]);
+				std::sort(filter.begin(), filter.end());
+				binaryPixelsData[i*nXSize + j] = *filter.begin();
 			}
 			else
 			{
@@ -418,6 +454,31 @@ void HazePerfection::removePeak()
 			}
 		}
 	}
+
+	////3*3×îÐ¡ÖµÂË²¨
+	//for (int i = 1; i < nYSize-1; i++)
+	//{
+	//	for (int j = 1; j < nXSize-1; j++)
+	//	{
+	//		if (binaryPixelsData[i*nXSize + j] == 1.0)
+	//		{
+	//			a[0] = erodePixelsData[(i - 1)*nXSize + j - 1];
+	//			a[1] = erodePixelsData[(i - 1)*nXSize + j ];
+	//			a[2] = erodePixelsData[(i - 1)*nXSize + j + 1];
+	//			a[3] = erodePixelsData[i*nXSize + j - 1];
+	//			a[4] = erodePixelsData[i*nXSize + j ];
+	//			a[5] = erodePixelsData[i*nXSize + j + 1];
+	//			a[6] = erodePixelsData[(i + 1)*nXSize + j - 1];
+	//			a[7] = erodePixelsData[(i + 1)*nXSize + j ];
+	//			a[8] = erodePixelsData[(i + 1)*nXSize + j + 1];
+	//			binaryPixelsData[i*nXSize + j] = minA(a, 9);
+	//		}
+	//		else
+	//		{
+	//			binaryPixelsData[i*nXSize + j] = erodePixelsData[i*nXSize + j];
+	//		}
+	//	}
+	//}
 	resultDataset->GetRasterBand(1)->RasterIO(GF_Write, 0, 0, nXSize, nYSize, binaryPixelsData, nXSize, nYSize, GDT_Float32, 0, 0);
 	delete[]erodePixelsData;
 	delete[]binaryPixelsData;
@@ -468,4 +529,20 @@ void HazePerfection::difference(GDALDataset *aDataset, GDALDataset *bDataset)
 	totalChangeDataset->GetRasterBand(1)->RasterIO(GF_Write, 0, 0, nXSize, nYSize, aPixelsData, nXSize, nYSize, GDT_Float32, 0, 0);
 	delete[]aPixelsData;
 	delete[]bPixelsData;
+}
+
+void HazePerfection::setFilterTemplate(int n /*= 3*/)
+{
+	int temp = n % 2;
+	if (temp == 0)
+		filterTemplateN = 3;
+	else
+	{
+		filterTemplateN = n;
+	}
+}
+
+GDALDataset * HazePerfection::getResultDataset()
+{
+	return resultDataset;
 }
